@@ -133,7 +133,7 @@ public class AccountService {
                   balanceDTO.setMonthlyMovementLimit(account.getMonthlyMovementLimit());
                   balanceDTO.setMonthlyMovementsAvailable(account.getMonthlyMovementLimit() - qty);
                   //balanceDTO.setAccountNumber(account.getAccountNumber());
-                  balanceDTO.setType("Saving Account");
+                  balanceDTO.setType("Fixed Account");
                   balanceDTO.setAmount(balance);
                   return balanceDTO;
                 });
