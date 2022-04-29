@@ -10,6 +10,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.modelmapper.ModelMapper;
+import org.springframework.core.env.Environment;
+import com.bank.bootcamp.fixedaccounts.dto.CreateAccountDTO;
 import com.bank.bootcamp.fixedaccounts.dto.CreateTransactionDTO;
 import com.bank.bootcamp.fixedaccounts.entity.Account;
 import com.bank.bootcamp.fixedaccounts.entity.Transaction;
@@ -18,7 +21,6 @@ import com.bank.bootcamp.fixedaccounts.repository.AccountRepository;
 import com.bank.bootcamp.fixedaccounts.repository.TransactionRepository;
 import com.bank.bootcamp.fixedaccounts.service.AccountService;
 import com.bank.bootcamp.fixedaccounts.service.NextSequenceService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -29,14 +31,17 @@ public class FixedAcountsApplicationTests {
   private static AccountRepository accountRepository;
   private static TransactionRepository transactionRepository;
   private static NextSequenceService nextSequenceService;
-  private ObjectMapper mapper = new ObjectMapper();
+  private static Environment env;
+  
+  private ModelMapper mapper = new ModelMapper();
   
   @BeforeAll
   public static void setup() {
     accountRepository = mock(AccountRepository.class);
     transactionRepository = mock(TransactionRepository.class);
     nextSequenceService = mock(NextSequenceService.class);
-    accountService = new AccountService(accountRepository, transactionRepository, nextSequenceService);
+    env = mock(Environment.class);
+    accountService = new AccountService(accountRepository, transactionRepository, nextSequenceService, env);
   }
   
   private Account getAccount() {
@@ -51,14 +56,16 @@ public class FixedAcountsApplicationTests {
   public void createAccountWithAllData() throws Exception {
     
     var account = getAccount();
+    var accountDTO = mapper.map(account, CreateAccountDTO.class);
+    accountDTO.setOpeningAmount(100d);
     
-    var savedAccount = mapper.readValue(mapper.writeValueAsString(account), Account.class);
+    var savedAccount = mapper.map(account, Account.class);
     savedAccount.setId(UUID.randomUUID().toString());
     
     when(accountRepository.findByCustomerId(account.getCustomerId())).thenReturn(Mono.empty());
-    when(accountRepository.save(account)).thenReturn(Mono.just(savedAccount));
+    when(accountRepository.save(Mockito.any(Account.class))).thenReturn(Mono.just(savedAccount));
     
-    var mono = accountService.createAccount(account);
+    var mono = accountService.createAccount(accountDTO);
     StepVerifier.create(mono).assertNext(acc -> {
       assertThat(acc.getMonthlyMovementLimit()).isEqualTo(1);
       assertThat(acc.getId()).isNotNull();
@@ -81,7 +88,7 @@ public class FixedAcountsApplicationTests {
     createTransactionDTO.setAccountId(accountId);
     createTransactionDTO.setDescription("Deposito ventanilla");
     
-    var transactionSaved = mapper.readValue(mapper.writeValueAsString(createTransactionDTO), Transaction.class);
+    var transactionSaved = mapper.map(createTransactionDTO, Transaction.class);
     transactionSaved.setId(UUID.randomUUID().toString());
     transactionSaved.setOperationNumber(1);
     transactionSaved.setRegisterDate(LocalDateTime.now());
@@ -113,7 +120,7 @@ public class FixedAcountsApplicationTests {
     createTransactionDTO.setAccountId(accountId);
     createTransactionDTO.setDescription("Deposito ventanilla");
     
-    var transactionSaved = mapper.readValue(mapper.writeValueAsString(createTransactionDTO), Transaction.class);
+    var transactionSaved = mapper.map(createTransactionDTO, Transaction.class);
     transactionSaved.setId(UUID.randomUUID().toString());
     transactionSaved.setOperationNumber(1);
     transactionSaved.setRegisterDate(LocalDateTime.now());
@@ -149,7 +156,7 @@ public class FixedAcountsApplicationTests {
     createTransaction2DTO.setAccountId(accountId);
     createTransaction2DTO.setDescription("Deposito ventanilla");
     
-    var transactionSaved = mapper.readValue(mapper.writeValueAsString(createTransaction1DTO), Transaction.class);
+    var transactionSaved = mapper.map(createTransaction1DTO, Transaction.class);
     transactionSaved.setId(UUID.randomUUID().toString());
     transactionSaved.setOperationNumber(1);
     transactionSaved.setRegisterDate(LocalDateTime.now());
@@ -189,7 +196,7 @@ public class FixedAcountsApplicationTests {
     createTransactionDTO.setAccountId(accountId);
     createTransactionDTO.setDescription("Deposito cajero");
     
-    var transactionSaved = mapper.readValue(mapper.writeValueAsString(createTransactionDTO), Transaction.class);
+    var transactionSaved = mapper.map(createTransactionDTO, Transaction.class);
     transactionSaved.setId(UUID.randomUUID().toString());
     transactionSaved.setOperationNumber(1);
     transactionSaved.setRegisterDate(LocalDateTime.now());
@@ -212,7 +219,7 @@ public class FixedAcountsApplicationTests {
     createTransactionDTO.setAccountId(accountId);
     createTransactionDTO.setDescription("Deposito cajero");
     
-    var transactionSaved = mapper.readValue(mapper.writeValueAsString(createTransactionDTO), Transaction.class);
+    var transactionSaved = mapper.map(createTransactionDTO, Transaction.class);
     transactionSaved.setId(UUID.randomUUID().toString());
     transactionSaved.setOperationNumber(1);
     transactionSaved.setRegisterDate(LocalDateTime.now());

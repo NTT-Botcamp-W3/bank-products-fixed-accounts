@@ -1,7 +1,6 @@
 package com.bank.bootcamp.fixedaccounts.controller;
 
 import java.time.LocalDate;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,7 +13,6 @@ import com.bank.bootcamp.fixedaccounts.dto.CreateTransactionDTO;
 import com.bank.bootcamp.fixedaccounts.entity.Account;
 import com.bank.bootcamp.fixedaccounts.entity.Transaction;
 import com.bank.bootcamp.fixedaccounts.service.AccountService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -25,7 +23,6 @@ import reactor.core.publisher.Mono;
 public class AccountController {
 
   private final AccountService accountService;
-  private ObjectMapper mapper = new ObjectMapper();
   
   @GetMapping("/balance/{accountId}")
   public Mono<BalanceDTO> getBalanceByAccountId(@PathVariable("accountId") String accountId) {
@@ -39,8 +36,7 @@ public class AccountController {
   
   @PostMapping
   public Mono<String> createAccount(@RequestBody CreateAccountDTO dto) throws Exception {
-    var account = mapper.readValue(mapper.writeValueAsString(dto), Account.class);
-    return accountService.createAccount(account).map(Account::getId);
+    return accountService.createAccount(dto).map(Account::getId);
   }
   
   @PostMapping("/transaction")

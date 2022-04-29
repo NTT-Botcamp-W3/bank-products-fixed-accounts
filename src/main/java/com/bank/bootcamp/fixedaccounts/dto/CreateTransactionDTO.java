@@ -9,5 +9,5 @@ public class CreateTransactionDTO {
   private String agent;
   private String description;
   private Double amount;
-  
+  private Double openingAmount;
 }

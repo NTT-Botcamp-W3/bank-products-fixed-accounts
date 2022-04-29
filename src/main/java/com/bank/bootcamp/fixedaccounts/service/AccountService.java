@@ -6,11 +6,12 @@ import java.time.YearMonth;
 import java.time.temporal.ChronoField;
 import java.util.Optional;
 import java.util.function.Predicate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.modelmapper.ModelMapper;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import com.bank.bootcamp.fixedaccounts.dto.BalanceDTO;
+import com.bank.bootcamp.fixedaccounts.dto.CreateAccountDTO;
 import com.bank.bootcamp.fixedaccounts.dto.CreateTransactionDTO;
 import com.bank.bootcamp.fixedaccounts.entity.Account;
 import com.bank.bootcamp.fixedaccounts.entity.Transaction;
@@ -18,7 +19,6 @@ import com.bank.bootcamp.fixedaccounts.entity.TransactionSequences;
 import com.bank.bootcamp.fixedaccounts.exception.BankValidationException;
 import com.bank.bootcamp.fixedaccounts.repository.AccountRepository;
 import com.bank.bootcamp.fixedaccounts.repository.TransactionRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -27,27 +27,47 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class AccountService {
   
-  private static final Logger logger = LoggerFactory.getLogger(AccountService.class);
-  
   private final AccountRepository accountRepository;
   private final TransactionRepository transactionRepository;
   private final NextSequenceService nextSequenceService;
+  private final Environment env;
   
-  private ObjectMapper objectMapper = new ObjectMapper();
+  private ModelMapper mapper = new ModelMapper();
 
-  public Mono<Account> createAccount(Account account) {
-    return Mono.just(account)
-        .then(check(account, acc -> Optional.of(acc).isEmpty(), "Account has not data"))
-        .then(check(account, acc -> ObjectUtils.isEmpty(acc.getCustomerId()), "Customer ID is required"))
-        .then(check(account, acc -> ObjectUtils.isEmpty(acc.getAssignedDayNumberForMovement()), "Assigned day number for movement is required"))
-        .then(check(account, acc -> acc.getAssignedDayNumberForMovement() < 1 && acc.getAssignedDayNumberForMovement() > 28, "Assigned day number for movement must be between 1 and 28"))
-        .then(accountRepository.findByCustomerId(account.getCustomerId())
-            .<Account>handle((record, sink) -> sink.error(new BankValidationException("Customer already has an saving account")))
-            .switchIfEmpty(Mono.just(account)))
-        .flatMap(acc -> {
-            acc.setMonthlyMovementLimit(1); // maximo movimientos mensuales
-            return accountRepository.save(acc);
-         });
+  public Mono<Account> createAccount(CreateAccountDTO dto) {
+    var minimumOpeningAmount = Double.parseDouble(Optional.ofNullable(env.getProperty("account.minimum-opening-amount")).orElse("0"));
+    return Mono.just(dto)
+        .then(check(dto, acc -> Optional.of(acc).isEmpty(), "Account has not data"))
+        .then(check(dto, acc -> ObjectUtils.isEmpty(acc.getCustomerId()), "Customer ID is required"))
+        .then(check(dto, acc -> ObjectUtils.isEmpty(acc.getAssignedDayNumberForMovement()), "Assigned day number for movement is required"))
+        .then(check(dto, acc -> acc.getAssignedDayNumberForMovement() < 1 && acc.getAssignedDayNumberForMovement() > 28, "Assigned day number for movement must be between 1 and 28"))
+        .then(check(dto, acc -> ObjectUtils.isEmpty(acc.getOpeningAmount()), "Opening amount is required"))
+        .then(check(dto, acc -> acc.getOpeningAmount() < minimumOpeningAmount, String.format("The minimum opening amount is %s", minimumOpeningAmount)))
+        .then(accountRepository.findByCustomerId(dto.getCustomerId())
+            .<CreateAccountDTO>handle((record, sink) -> sink.error(new BankValidationException("Customer already has an saving account")))
+        )
+        .switchIfEmpty(Mono.just(dto))
+        .flatMap(accountDTO -> {
+          var account = mapper.map(accountDTO, Account.class);
+          account.setMonthlyMovementLimit(1); // maximo movimientos mensuales
+          return accountRepository.save(account)
+              .flatMap(savedAccount -> {
+                return nextSequenceService.getNextSequence(TransactionSequences.class.getSimpleName())
+                    .map(nextSeq -> {
+                      var openingTransaction = new Transaction();
+                      openingTransaction.setAccountId(savedAccount.getId());
+                      openingTransaction.setAgent("-");
+                      openingTransaction.setAmount(accountDTO.getOpeningAmount());
+                      openingTransaction.setDescription("Opening account");
+                      openingTransaction.setOperationNumber(nextSeq);
+                      openingTransaction.setRegisterDate(LocalDateTime.now());
+                      return openingTransaction;
+                    })
+                    .flatMap(tx -> {
+                      return transactionRepository.save(tx).map(tt -> savedAccount);
+                    });
+          });
+        });
   }
   
   private <T> Mono<Void> check(T customer, Predicate<T> predicate, String messageForException) {
@@ -62,6 +82,7 @@ public class AccountService {
   }
 
   public Mono<Transaction> createTransaction(CreateTransactionDTO createTransactionDTO) {
+    
     return Mono.just(createTransactionDTO)
         .then(check(createTransactionDTO, dto -> Optional.of(dto).isEmpty(), "No data for create transaction"))
         .then(check(createTransactionDTO, dto -> ObjectUtils.isEmpty(dto.getAccountId()), "Account ID is required"))
@@ -99,15 +120,10 @@ public class AccountService {
             return Mono.error(new BankValidationException("Insuficient balance"));
           else {
             return nextSequenceService.getNextSequence(TransactionSequences.class.getSimpleName()).<Transaction>flatMap(nextSeq -> {
-              try {
-                var transaction = objectMapper.readValue(objectMapper.writeValueAsString(createTransactionDTO), Transaction.class);
+                var transaction = mapper.map(createTransactionDTO, Transaction.class);
                 transaction.setOperationNumber(nextSeq);
                 transaction.setRegisterDate(LocalDateTime.now());
                 return transactionRepository.save(transaction);
-              } catch (Exception ex) {
-                logger.error("Error en mapper", ex);
-                return Mono.error(ex);
-              }
             });
           }
         });
