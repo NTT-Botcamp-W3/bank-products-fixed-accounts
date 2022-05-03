@@ -10,4 +10,5 @@ public class CreateTransactionDTO {
   private String description;
   private Double amount;
   private Double openingAmount;
+  private Boolean createByComission = Boolean.FALSE;
 }
