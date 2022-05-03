@@ -1,5 +1,6 @@
 package com.bank.bootcamp.fixedaccounts.repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
@@ -18,4 +19,9 @@ public interface TransactionRepository extends ReactiveMongoRepository<Transacti
   })
   public Mono<Double> getBalanceByAccountId(String accountId);
   
+  @Aggregation(pipeline = {
+      "{ $match: { accountId: ?0, registerDate : { $lt: ?1 } }}",
+      "{ $group: { _id: '', total: {$sum: $amount }}}"
+  })
+  public Mono<Double> getBalanceByAccountIdToDate(String accountId, LocalDate toDate);
 }

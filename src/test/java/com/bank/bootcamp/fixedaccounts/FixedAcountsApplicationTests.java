@@ -305,5 +305,14 @@ public class FixedAcountsApplicationTests {
     }).verifyComplete();
   }
   
+//  public void averageDailyReport() {
+//    var accountId = "Account-001";
+//    var existentTransaction1 = new Transaction();
+//    existentTransaction1.setAmount(100d);
+//    
+//    when(transactionRepository.findByAccountIdAndRegisterDateBetween(Mockito.anyString(), Mockito.any(LocalDateTime.class), Mockito.any(LocalDateTime.class))).thenReturn(Flux.just(existentTransaction));
+//    var flux = accountService.getAverageDailyReportByAccount(accountId);
+//  }
+  
 
 }

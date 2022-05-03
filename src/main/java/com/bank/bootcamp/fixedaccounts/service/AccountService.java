@@ -10,6 +10,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
+import com.bank.bootcamp.fixedaccounts.dto.AverageDTO;
 import com.bank.bootcamp.fixedaccounts.dto.BalanceDTO;
 import com.bank.bootcamp.fixedaccounts.dto.CreateAccountDTO;
 import com.bank.bootcamp.fixedaccounts.dto.CreateTransactionDTO;
@@ -278,4 +279,10 @@ public class AccountService {
         })
         ;
   }
+
+  public Flux<AverageDTO> getAverageDailyReportByAccount(String accountId) {
+    // TODO Auto-generated method stub
+    return null;
+  }
+  
 }
